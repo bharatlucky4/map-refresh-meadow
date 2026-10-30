@@ -72,10 +72,10 @@ export function sampleWind(g: WindGrid, lat: number, lon: number): { u: number; 
   const fx = x - Math.floor(x);
   const i = (yy: number, xx: number) => yy * g.nLon + xx;
   const mix = (a: Float32Array) =>
-    a[i(y0, x0)] * (1 - fx) * (1 - fy) +
-    a[i(y0, x1)] * fx * (1 - fy) +
-    a[i(y0 + 1, x0)] * (1 - fx) * fy +
-    a[i(y0 + 1, x1)] * fx * fy;
+    (a[i(y0, x0)] ?? 0) * (1 - fx) * (1 - fy) +
+    (a[i(y0, x1)] ?? 0) * fx * (1 - fy) +
+    (a[i(y0 + 1, x0)] ?? 0) * (1 - fx) * fy +
+    (a[i(y0 + 1, x1)] ?? 0) * fx * fy;
   return { u: mix(g.u), v: mix(g.v) };
 }
 
@@ -89,5 +89,5 @@ export const LEGEND = [
 
 export function speedColor(kmh: number) {
   for (const l of LEGEND) if (kmh < l.max) return l.color;
-  return LEGEND[LEGEND.length - 1].color;
+  return LEGEND[LEGEND.length - 1]!.color;
 }
