@@ -37,7 +37,7 @@ export function normalizeLon(lon: number) {
 }
 
 export async function fetchCurrentWeather(c: Coords, signal?: AbortSignal): Promise<CurrentWeather> {
-  const res = await fetch(buildWeatherUrl(c), { signal });
+  const res = await fetch(buildWeatherUrl(c), { signal: signal ?? null });
   if (!res.ok) throw new Error(`Weather service responded ${res.status}`);
   const j = await res.json();
   const cur = j.current;
