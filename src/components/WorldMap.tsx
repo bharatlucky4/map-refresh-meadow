@@ -1,12 +1,21 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
+import { normalizeLon, type Coords } from "@/lib/weather";
 
 const WORLD_CENTER: L.LatLngExpression = [20, 0];
 const WORLD_ZOOM = 2;
 
-export default function WorldMap() {
+type Props = {
+  selected?: Coords | null;
+  onSelect?: (c: Coords) => void;
+};
+
+export default function WorldMap({ selected, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.CircleMarker | null>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -23,6 +32,9 @@ export default function WorldMap() {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      onSelectRef.current?.({ lat: e.latlng.lat, lon: normalizeLon(e.latlng.lng) });
+    });
     mapRef.current = map;
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(containerRef.current);
@@ -30,12 +42,33 @@ export default function WorldMap() {
       ro.disconnect();
       map.remove();
       mapRef.current = null;
+      markerRef.current = null;
     };
   }, []);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!selected) {
+      markerRef.current?.remove();
+      markerRef.current = null;
+      return;
+    }
+    const ll: L.LatLngExpression = [selected.lat, selected.lon];
+    if (markerRef.current) markerRef.current.setLatLng(ll);
+    else
+      markerRef.current = L.circleMarker(ll, {
+        radius: 7,
+        weight: 2,
+        color: "#ffffff",
+        fillColor: "#e11d48",
+        fillOpacity: 1,
+      }).addTo(map);
+  }, [selected]);
+
   return (
     <div className="relative h-full w-full">
-      <div ref={containerRef} data-world-map className="h-full w-full" />
+      <div ref={containerRef} data-world-map className="h-full w-full cursor-crosshair" />
       <button
         type="button"
         aria-label="Return to world view"
