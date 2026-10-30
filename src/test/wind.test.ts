@@ -19,6 +19,6 @@ describe("wind", () => {
     expect(sampleWind(g, 85, 0)).toBeNull();
   });
   it("60+ km/h uses top legend color", () => {
-    expect(speedColor(75)).toBe(LEGEND[4].color);
+    expect(speedColor(75)).toBe(LEGEND[4]!.color);
   });
 });
