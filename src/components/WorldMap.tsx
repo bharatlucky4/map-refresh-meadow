@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { WindLayer } from "./WindLayer";
+import { fetchWindGrid, LEGEND, type WindGrid } from "@/lib/wind";
 import L from "leaflet";
 import { normalizeLon, type Coords } from "@/lib/weather";
 
@@ -16,6 +18,26 @@ export default function WorldMap({ selected, onSelect }: Props) {
   const markerRef = useRef<L.CircleMarker | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const [mapInst, setMapInst] = useState<L.Map | null>(null);
+  const [windOn, setWindOn] = useState(true);
+  const [grid, setGrid] = useState<WindGrid | null>(null);
+  const [windState, setWindState] = useState<"idle" | "loading" | "error">("idle");
+  const [windTry, setWindTry] = useState(0);
+
+  useEffect(() => {
+    if (!windOn || grid) return;
+    const ctrl = new AbortController();
+    setWindState("loading");
+    fetchWindGrid(ctrl.signal)
+      .then((g) => {
+        setGrid(g);
+        setWindState("idle");
+      })
+      .catch(() => {
+        if (!ctrl.signal.aborted) setWindState("error");
+      });
+    return () => ctrl.abort();
+  }, [windOn, grid, windTry]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -36,12 +58,14 @@ export default function WorldMap({ selected, onSelect }: Props) {
       onSelectRef.current?.({ lat: e.latlng.lat, lon: normalizeLon(e.latlng.lng) });
     });
     mapRef.current = map;
+    setMapInst(map);
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(containerRef.current);
     return () => {
       ro.disconnect();
       map.remove();
       mapRef.current = null;
+      setMapInst(null);
       markerRef.current = null;
     };
   }, []);
@@ -69,6 +93,39 @@ export default function WorldMap({ selected, onSelect }: Props) {
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} data-world-map className="h-full w-full cursor-crosshair" />
+      {windOn && mapInst && grid && <WindLayer map={mapInst} grid={grid} />}
+      <div className="absolute right-[10px] top-[132px] z-[1000] w-[150px] rounded-md border border-border bg-card/95 p-2 text-xs text-card-foreground shadow-md backdrop-blur">
+        <label className="flex cursor-pointer items-center justify-between gap-2 font-medium">
+          Wind layer
+          <input
+            type="checkbox"
+            aria-label="Wind layer"
+            checked={windOn}
+            onChange={(e) => setWindOn(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+        </label>
+        {windOn && windState === "loading" && <p className="mt-1 text-muted-foreground">Loading wind…</p>}
+        {windOn && windState === "error" && (
+          <p className="mt-1 text-destructive">
+            Wind data unavailable.{" "}
+            <button type="button" className="underline" onClick={() => setWindTry((n) => n + 1)}>
+              Retry
+            </button>
+          </p>
+        )}
+        {windOn && grid && (
+          <div className="mt-2 space-y-1" data-wind-legend>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Wind speed (km/h)</p>
+            {LEGEND.map((l) => (
+              <div key={l.label} className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-5 rounded-full" style={{ background: l.color }} />
+                {l.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <button
         type="button"
         aria-label="Return to world view"
